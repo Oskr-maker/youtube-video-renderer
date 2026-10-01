@@ -1,3 +1,11 @@
+from fastapi import FastAPI
+import subprocess
+
+app = FastAPI()
+
+@app.get("/health")
+def health():
+    result = subprocess.run(
         ["ffmpeg", "-version"],
         capture_output=True,
         text=True

@@ -97,9 +97,7 @@ async def concat_audio(
             ) as audio_file:
                 audio_file.write(content)
 
-            input_paths.append(
-                input_path
-            )
+            input_paths.append(input_path)
 
         ffmpeg_inputs = []
 
@@ -111,9 +109,7 @@ async def concat_audio(
 
         filter_parts = []
 
-        for index in range(
-            len(input_paths)
-        ):
+        for index in range(len(input_paths)):
 
             filter_parts.append(
                 f"[{index}:a]"
@@ -127,31 +123,21 @@ async def concat_audio(
 
         concat_labels = []
 
-        for index in range(
-            len(input_paths)
-        ):
+        for index in range(len(input_paths)):
 
             concat_labels.append(
                 f"[a{index}]"
             )
 
-            if index < len(
-                input_paths
-            ) - 1:
+            if index < len(input_paths) - 1:
 
-                if index < len(
-                    pause_values
-                ):
-                    pause_ms = (
-                        pause_values[index]
-                    )
+                if index < len(pause_values):
+                    pause_ms = pause_values[index]
                 else:
                     pause_ms = 300
 
                 try:
-                    pause_ms = float(
-                        pause_ms
-                    )
+                    pause_ms = float(pause_ms)
                 except Exception:
                     pause_ms = 300
 
@@ -183,9 +169,7 @@ async def concat_audio(
         )
 
         concat_filter = (
-            "".join(
-                concat_labels
-            )
+            "".join(concat_labels)
             +
             f"concat=n={concat_count}:"
             f"v=0:a=1[outa]"
@@ -207,6 +191,7 @@ async def concat_audio(
         command = [
             "ffmpeg",
             "-y",
+
             *ffmpeg_inputs,
 
             "-filter_complex",
@@ -241,10 +226,8 @@ async def concat_audio(
                 status_code=500,
                 content={
                     "status": "error",
-                    "message":
-                        "FFmpeg audio concat failed",
-                    "ffmpeg_error":
-                        result.stderr
+                    "message": "FFmpeg audio concat failed",
+                    "ffmpeg_error": result.stderr
                 }
             )
 
@@ -261,8 +244,7 @@ async def concat_audio(
     return FileResponse(
         final_path,
         media_type="audio/mpeg",
-        filename=
-            "voice_final_kokoro.mp3"
+        filename="voice_final_kokoro.mp3"
     )
 
 
@@ -274,33 +256,18 @@ async def concat_audio(
 async def concat_video(
     files: List[UploadFile] = File(...)
 ):
-    """
-    Recibe múltiples MP4 ya ordenados y los concatena.
-
-    Form-data:
-    files = varios MP4
-
-    Devuelve:
-    youtube_v4_visual_concat.mp4
-    """
-
     if not files:
         return JSONResponse(
             status_code=400,
             content={
                 "status": "error",
-                "message":
-                    "No video files received"
+                "message": "No video files received"
             }
         )
 
     with tempfile.TemporaryDirectory() as tmpdir:
 
         input_paths = []
-
-        # -------------------------------------------------
-        # GUARDAR SECCIONES
-        # -------------------------------------------------
 
         for index, upload in enumerate(files):
 
@@ -311,8 +278,7 @@ async def concat_video(
                     status_code=400,
                     content={
                         "status": "error",
-                        "message":
-                            f"Empty video file at index {index}"
+                        "message": f"Empty video file at index {index}"
                     }
                 )
 
@@ -325,17 +291,11 @@ async def concat_video(
                 input_path,
                 "wb"
             ) as video_file:
-                video_file.write(
-                    content
-                )
+                video_file.write(content)
 
             input_paths.append(
                 input_path
             )
-
-        # -------------------------------------------------
-        # CREAR LISTA CONCAT FFMPEG
-        # -------------------------------------------------
 
         concat_list_path = os.path.join(
             tmpdir,
@@ -360,11 +320,6 @@ async def concat_video(
                 concat_file.write(
                     f"file '{safe_path}'\n"
                 )
-
-        # -------------------------------------------------
-        # PRIMER INTENTO:
-        # CONCAT SIN RECODIFICAR
-        # -------------------------------------------------
 
         output_path = os.path.join(
             tmpdir,
@@ -399,18 +354,11 @@ async def concat_video(
             text=True
         )
 
-        # -------------------------------------------------
-        # FALLBACK:
-        # SI COPY FALLA, NORMALIZAR Y RECODIFICAR
-        # -------------------------------------------------
-
         if copy_result.returncode != 0:
 
             normalized_paths = []
 
-            for index, input_path in enumerate(
-                input_paths
-            ):
+            for index, input_path in enumerate(input_paths):
 
                 normalized_path = os.path.join(
                     tmpdir,
@@ -455,28 +403,20 @@ async def concat_video(
                     normalized_path
                 ]
 
-                normalize_result = (
-                    subprocess.run(
-                        normalize_command,
-                        capture_output=True,
-                        text=True
-                    )
+                normalize_result = subprocess.run(
+                    normalize_command,
+                    capture_output=True,
+                    text=True
                 )
 
-                if (
-                    normalize_result.returncode
-                    != 0
-                ):
+                if normalize_result.returncode != 0:
                     return JSONResponse(
                         status_code=500,
                         content={
                             "status": "error",
-                            "message":
-                                "FFmpeg normalization failed",
-                            "section":
-                                index + 1,
-                            "ffmpeg_error":
-                                normalize_result.stderr
+                            "message": "FFmpeg normalization failed",
+                            "section": index + 1,
+                            "ffmpeg_error": normalize_result.stderr
                         }
                     )
 
@@ -484,11 +424,9 @@ async def concat_video(
                     normalized_path
                 )
 
-            normalized_list_path = (
-                os.path.join(
-                    tmpdir,
-                    "concat_normalized.txt"
-                )
+            normalized_list_path = os.path.join(
+                tmpdir,
+                "concat_normalized.txt"
             )
 
             with open(
@@ -538,24 +476,15 @@ async def concat_video(
                 text=True
             )
 
-            if (
-                final_result.returncode
-                != 0
-            ):
+            if final_result.returncode != 0:
                 return JSONResponse(
                     status_code=500,
                     content={
                         "status": "error",
-                        "message":
-                            "FFmpeg final concat failed",
-                        "ffmpeg_error":
-                            final_result.stderr
+                        "message": "FFmpeg final concat failed",
+                        "ffmpeg_error": final_result.stderr
                     }
                 )
-
-        # -------------------------------------------------
-        # COPIAR FUERA DEL TEMPDIR
-        # -------------------------------------------------
 
         final_path = (
             "/tmp/"
@@ -570,8 +499,192 @@ async def concat_video(
     return FileResponse(
         final_path,
         media_type="video/mp4",
-        filename=
-            "youtube_v4_visual_concat.mp4"
+        filename="youtube_v4_visual_concat.mp4"
+    )
+
+
+# =====================================================
+# MUX VIDEO V4 + KOKORO AUDIO
+# =====================================================
+
+@app.post("/mux-video-audio")
+async def mux_video_audio(
+    video: UploadFile = File(...),
+    audio: UploadFile = File(...)
+):
+    """
+    Recibe:
+
+    video:
+        vídeo V4 completo concatenado
+
+    audio:
+        voz final Kokoro concatenada
+
+    Devuelve:
+        youtube_v4_final_with_audio.mp4
+
+    El vídeo NO se vuelve a codificar.
+    Solo se codifica el audio a AAC.
+    """
+
+    video_content = await video.read()
+    audio_content = await audio.read()
+
+    if not video_content:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "Video file is empty"
+            }
+        )
+
+    if not audio_content:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "Audio file is empty"
+            }
+        )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+
+        video_path = os.path.join(
+            tmpdir,
+            "video_v4.mp4"
+        )
+
+        audio_path = os.path.join(
+            tmpdir,
+            "voice_final_kokoro.mp3"
+        )
+
+        output_path = os.path.join(
+            tmpdir,
+            "youtube_v4_final_with_audio.mp4"
+        )
+
+        with open(
+            video_path,
+            "wb"
+        ) as video_file:
+            video_file.write(
+                video_content
+            )
+
+        with open(
+            audio_path,
+            "wb"
+        ) as audio_file:
+            audio_file.write(
+                audio_content
+            )
+
+        # -------------------------------------------------
+        # MUX
+        #
+        # - vídeo: COPY, sin pérdida ni nuevo render
+        # - audio: AAC 192 kbps
+        # - audio padded si acaba antes
+        # - resultado acaba al finalizar el vídeo
+        # -------------------------------------------------
+
+        command = [
+            "ffmpeg",
+            "-y",
+
+            "-i",
+            video_path,
+
+            "-i",
+            audio_path,
+
+            "-map",
+            "0:v:0",
+
+            "-map",
+            "1:a:0",
+
+            "-c:v",
+            "copy",
+
+            "-c:a",
+            "aac",
+
+            "-b:a",
+            "192k",
+
+            "-ar",
+            "48000",
+
+            "-ac",
+            "2",
+
+            "-af",
+            "apad",
+
+            "-shortest",
+
+            "-movflags",
+            "+faststart",
+
+            output_path
+        ]
+
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode != 0:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status": "error",
+                    "message": "FFmpeg video/audio mux failed",
+                    "ffmpeg_error": result.stderr
+                }
+            )
+
+        if not os.path.exists(
+            output_path
+        ):
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status": "error",
+                    "message": "MUX output file was not created"
+                }
+            )
+
+        if os.path.getsize(
+            output_path
+        ) <= 0:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status": "error",
+                    "message": "MUX output file is empty"
+                }
+            )
+
+        final_path = (
+            "/tmp/"
+            "youtube_v4_final_with_audio.mp4"
+        )
+
+        shutil.copyfile(
+            output_path,
+            final_path
+        )
+
+    return FileResponse(
+        final_path,
+        media_type="video/mp4",
+        filename="youtube_v4_final_with_audio.mp4"
     )
 
 

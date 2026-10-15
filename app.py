@@ -12,6 +12,51 @@ app = FastAPI()
 
 
 # =====================================================
+# HELPERS
+# =====================================================
+
+def parse_fraction(value):
+    """
+    Convierte valores de ffprobe como:
+    30/1
+    30000/1001
+    en float.
+    """
+
+    if value is None:
+        return None
+
+    try:
+        value = str(value)
+
+        if "/" in value:
+            numerator, denominator = value.split("/", 1)
+
+            numerator = float(numerator)
+            denominator = float(denominator)
+
+            if denominator == 0:
+                return None
+
+            return numerator / denominator
+
+        return float(value)
+
+    except Exception:
+        return None
+
+
+def safe_float(value):
+    if value is None:
+        return None
+
+    try:
+        return float(value)
+    except Exception:
+        return None
+
+
+# =====================================================
 # HEALTH
 # =====================================================
 
@@ -23,11 +68,28 @@ def health():
         text=True
     )
 
-    first_line = result.stdout.splitlines()[0] if result.stdout else ""
+    first_line = (
+        result.stdout.splitlines()[0]
+        if result.stdout
+        else ""
+    )
+
+    ffprobe_result = subprocess.run(
+        ["ffprobe", "-version"],
+        capture_output=True,
+        text=True
+    )
+
+    ffprobe_first_line = (
+        ffprobe_result.stdout.splitlines()[0]
+        if ffprobe_result.stdout
+        else ""
+    )
 
     return {
         "status": "ok",
-        "ffmpeg": first_line
+        "ffmpeg": first_line,
+        "ffprobe": ffprobe_first_line
     }
 
 
@@ -50,22 +112,30 @@ async def concat_audio(
         )
 
     try:
-        pause_values = json.loads(pauses)
+        pause_values = json.loads(
+            pauses
+        )
+
     except Exception as error:
         return JSONResponse(
             status_code=400,
             content={
                 "status": "error",
-                "message": f"Invalid pauses JSON: {str(error)}"
+                "message":
+                    f"Invalid pauses JSON: {str(error)}"
             }
         )
 
-    if not isinstance(pause_values, list):
+    if not isinstance(
+        pause_values,
+        list
+    ):
         return JSONResponse(
             status_code=400,
             content={
                 "status": "error",
-                "message": "pauses must be a JSON array"
+                "message":
+                    "pauses must be a JSON array"
             }
         )
 
@@ -73,7 +143,9 @@ async def concat_audio(
 
         input_paths = []
 
-        for index, upload in enumerate(files):
+        for index, upload in enumerate(
+            files
+        ):
 
             input_path = os.path.join(
                 tmpdir,
@@ -87,7 +159,8 @@ async def concat_audio(
                     status_code=400,
                     content={
                         "status": "error",
-                        "message": f"Empty audio file at index {index}"
+                        "message":
+                            f"Empty audio file at index {index}"
                     }
                 )
 
@@ -95,9 +168,13 @@ async def concat_audio(
                 input_path,
                 "wb"
             ) as audio_file:
-                audio_file.write(content)
+                audio_file.write(
+                    content
+                )
 
-            input_paths.append(input_path)
+            input_paths.append(
+                input_path
+            )
 
         ffmpeg_inputs = []
 
@@ -109,7 +186,9 @@ async def concat_audio(
 
         filter_parts = []
 
-        for index in range(len(input_paths)):
+        for index in range(
+            len(input_paths)
+        ):
 
             filter_parts.append(
                 f"[{index}:a]"
@@ -123,21 +202,33 @@ async def concat_audio(
 
         concat_labels = []
 
-        for index in range(len(input_paths)):
+        for index in range(
+            len(input_paths)
+        ):
 
             concat_labels.append(
                 f"[a{index}]"
             )
 
-            if index < len(input_paths) - 1:
+            if index < (
+                len(input_paths) - 1
+            ):
 
-                if index < len(pause_values):
-                    pause_ms = pause_values[index]
+                if index < len(
+                    pause_values
+                ):
+                    pause_ms = (
+                        pause_values[index]
+                    )
+
                 else:
                     pause_ms = 300
 
                 try:
-                    pause_ms = float(pause_ms)
+                    pause_ms = float(
+                        pause_ms
+                    )
+
                 except Exception:
                     pause_ms = 300
 
@@ -169,7 +260,9 @@ async def concat_audio(
         )
 
         concat_filter = (
-            "".join(concat_labels)
+            "".join(
+                concat_labels
+            )
             +
             f"concat=n={concat_count}:"
             f"v=0:a=1[outa]"
@@ -226,8 +319,10 @@ async def concat_audio(
                 status_code=500,
                 content={
                     "status": "error",
-                    "message": "FFmpeg audio concat failed",
-                    "ffmpeg_error": result.stderr
+                    "message":
+                        "FFmpeg audio concat failed",
+                    "ffmpeg_error":
+                        result.stderr
                 }
             )
 
@@ -244,7 +339,8 @@ async def concat_audio(
     return FileResponse(
         final_path,
         media_type="audio/mpeg",
-        filename="voice_final_kokoro.mp3"
+        filename=
+            "voice_final_kokoro.mp3"
     )
 
 
@@ -261,7 +357,8 @@ async def concat_video(
             status_code=400,
             content={
                 "status": "error",
-                "message": "No video files received"
+                "message":
+                    "No video files received"
             }
         )
 
@@ -269,7 +366,9 @@ async def concat_video(
 
         input_paths = []
 
-        for index, upload in enumerate(files):
+        for index, upload in enumerate(
+            files
+        ):
 
             content = await upload.read()
 
@@ -278,7 +377,8 @@ async def concat_video(
                     status_code=400,
                     content={
                         "status": "error",
-                        "message": f"Empty video file at index {index}"
+                        "message":
+                            f"Empty video file at index {index}"
                     }
                 )
 
@@ -291,7 +391,9 @@ async def concat_video(
                 input_path,
                 "wb"
             ) as video_file:
-                video_file.write(content)
+                video_file.write(
+                    content
+                )
 
             input_paths.append(
                 input_path
@@ -358,7 +460,9 @@ async def concat_video(
 
             normalized_paths = []
 
-            for index, input_path in enumerate(input_paths):
+            for index, input_path in enumerate(
+                input_paths
+            ):
 
                 normalized_path = os.path.join(
                     tmpdir,
@@ -403,20 +507,29 @@ async def concat_video(
                     normalized_path
                 ]
 
-                normalize_result = subprocess.run(
-                    normalize_command,
-                    capture_output=True,
-                    text=True
+                normalize_result = (
+                    subprocess.run(
+                        normalize_command,
+                        capture_output=True,
+                        text=True
+                    )
                 )
 
-                if normalize_result.returncode != 0:
+                if (
+                    normalize_result.returncode
+                    != 0
+                ):
                     return JSONResponse(
                         status_code=500,
                         content={
-                            "status": "error",
-                            "message": "FFmpeg normalization failed",
-                            "section": index + 1,
-                            "ffmpeg_error": normalize_result.stderr
+                            "status":
+                                "error",
+                            "message":
+                                "FFmpeg normalization failed",
+                            "section":
+                                index + 1,
+                            "ffmpeg_error":
+                                normalize_result.stderr
                         }
                     )
 
@@ -424,9 +537,11 @@ async def concat_video(
                     normalized_path
                 )
 
-            normalized_list_path = os.path.join(
-                tmpdir,
-                "concat_normalized.txt"
+            normalized_list_path = (
+                os.path.join(
+                    tmpdir,
+                    "concat_normalized.txt"
+                )
             )
 
             with open(
@@ -476,13 +591,19 @@ async def concat_video(
                 text=True
             )
 
-            if final_result.returncode != 0:
+            if (
+                final_result.returncode
+                != 0
+            ):
                 return JSONResponse(
                     status_code=500,
                     content={
-                        "status": "error",
-                        "message": "FFmpeg final concat failed",
-                        "ffmpeg_error": final_result.stderr
+                        "status":
+                            "error",
+                        "message":
+                            "FFmpeg final concat failed",
+                        "ffmpeg_error":
+                            final_result.stderr
                     }
                 )
 
@@ -499,7 +620,8 @@ async def concat_video(
     return FileResponse(
         final_path,
         media_type="video/mp4",
-        filename="youtube_v4_visual_concat.mp4"
+        filename=
+            "youtube_v4_visual_concat.mp4"
     )
 
 
@@ -512,22 +634,6 @@ async def mux_video_audio(
     video: UploadFile = File(...),
     audio: UploadFile = File(...)
 ):
-    """
-    Recibe:
-
-    video:
-        vídeo V4 completo concatenado
-
-    audio:
-        voz final Kokoro concatenada
-
-    Devuelve:
-        youtube_v4_final_with_audio.mp4
-
-    El vídeo NO se vuelve a codificar.
-    Solo se codifica el audio a AAC.
-    """
-
     video_content = await video.read()
     audio_content = await audio.read()
 
@@ -536,7 +642,8 @@ async def mux_video_audio(
             status_code=400,
             content={
                 "status": "error",
-                "message": "Video file is empty"
+                "message":
+                    "Video file is empty"
             }
         )
 
@@ -545,7 +652,8 @@ async def mux_video_audio(
             status_code=400,
             content={
                 "status": "error",
-                "message": "Audio file is empty"
+                "message":
+                    "Audio file is empty"
             }
         )
 
@@ -581,15 +689,6 @@ async def mux_video_audio(
             audio_file.write(
                 audio_content
             )
-
-        # -------------------------------------------------
-        # MUX
-        #
-        # - vídeo: COPY, sin pérdida ni nuevo render
-        # - audio: AAC 192 kbps
-        # - audio padded si acaba antes
-        # - resultado acaba al finalizar el vídeo
-        # -------------------------------------------------
 
         command = [
             "ffmpeg",
@@ -644,8 +743,10 @@ async def mux_video_audio(
                 status_code=500,
                 content={
                     "status": "error",
-                    "message": "FFmpeg video/audio mux failed",
-                    "ffmpeg_error": result.stderr
+                    "message":
+                        "FFmpeg video/audio mux failed",
+                    "ffmpeg_error":
+                        result.stderr
                 }
             )
 
@@ -656,7 +757,8 @@ async def mux_video_audio(
                 status_code=500,
                 content={
                     "status": "error",
-                    "message": "MUX output file was not created"
+                    "message":
+                        "MUX output file was not created"
                 }
             )
 
@@ -667,7 +769,8 @@ async def mux_video_audio(
                 status_code=500,
                 content={
                     "status": "error",
-                    "message": "MUX output file is empty"
+                    "message":
+                        "MUX output file is empty"
                 }
             )
 
@@ -684,8 +787,558 @@ async def mux_video_audio(
     return FileResponse(
         final_path,
         media_type="video/mp4",
-        filename="youtube_v4_final_with_audio.mp4"
+        filename=
+            "youtube_v4_final_with_audio.mp4"
     )
+
+
+# =====================================================
+# FINAL VIDEO QC / INSPECTION
+# =====================================================
+
+@app.post("/inspect-video")
+async def inspect_video(
+    file: UploadFile = File(...)
+):
+    """
+    QC técnico final del MP4.
+
+    Comprueba:
+    - vídeo presente
+    - audio presente
+    - H.264
+    - AAC
+    - 1920x1080
+    - ~30 FPS
+    - duración válida
+    - sincronía temporal aproximada A/V
+    """
+
+    content = await file.read()
+
+    if not content:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message":
+                    "Video file is empty",
+                "qcPassed":
+                    False
+            }
+        )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+
+        input_path = os.path.join(
+            tmpdir,
+            "final_v4.mp4"
+        )
+
+        with open(
+            input_path,
+            "wb"
+        ) as video_file:
+            video_file.write(
+                content
+            )
+
+        # -------------------------------------------------
+        # FFPROBE
+        # -------------------------------------------------
+
+        command = [
+            "ffprobe",
+            "-v",
+            "error",
+
+            "-print_format",
+            "json",
+
+            "-show_format",
+
+            "-show_streams",
+
+            input_path
+        ]
+
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode != 0:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status": "error",
+                    "message":
+                        "FFprobe inspection failed",
+                    "ffprobe_error":
+                        result.stderr,
+                    "qcPassed":
+                        False
+                }
+            )
+
+        try:
+            probe = json.loads(
+                result.stdout
+            )
+
+        except Exception as error:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status": "error",
+                    "message":
+                        f"Could not parse ffprobe JSON: {str(error)}",
+                    "qcPassed":
+                        False
+                }
+            )
+
+        streams = probe.get(
+            "streams",
+            []
+        )
+
+        format_data = probe.get(
+            "format",
+            {}
+        )
+
+        video_stream = next(
+            (
+                stream
+                for stream in streams
+                if stream.get(
+                    "codec_type"
+                ) == "video"
+            ),
+            None
+        )
+
+        audio_stream = next(
+            (
+                stream
+                for stream in streams
+                if stream.get(
+                    "codec_type"
+                ) == "audio"
+            ),
+            None
+        )
+
+        has_video = (
+            video_stream
+            is not None
+        )
+
+        has_audio = (
+            audio_stream
+            is not None
+        )
+
+        # -------------------------------------------------
+        # VIDEO DATA
+        # -------------------------------------------------
+
+        width = (
+            int(
+                video_stream.get(
+                    "width",
+                    0
+                )
+            )
+            if has_video
+            else 0
+        )
+
+        height = (
+            int(
+                video_stream.get(
+                    "height",
+                    0
+                )
+            )
+            if has_video
+            else 0
+        )
+
+        video_codec = (
+            video_stream.get(
+                "codec_name"
+            )
+            if has_video
+            else None
+        )
+
+        pixel_format = (
+            video_stream.get(
+                "pix_fmt"
+            )
+            if has_video
+            else None
+        )
+
+        fps = None
+
+        if has_video:
+            fps = parse_fraction(
+                video_stream.get(
+                    "avg_frame_rate"
+                )
+            )
+
+            if fps is None:
+                fps = parse_fraction(
+                    video_stream.get(
+                        "r_frame_rate"
+                    )
+                )
+
+        # -------------------------------------------------
+        # AUDIO DATA
+        # -------------------------------------------------
+
+        audio_codec = (
+            audio_stream.get(
+                "codec_name"
+            )
+            if has_audio
+            else None
+        )
+
+        audio_sample_rate = (
+            int(
+                audio_stream.get(
+                    "sample_rate",
+                    0
+                )
+            )
+            if (
+                has_audio
+                and audio_stream.get(
+                    "sample_rate"
+                )
+            )
+            else None
+        )
+
+        audio_channels = (
+            int(
+                audio_stream.get(
+                    "channels",
+                    0
+                )
+            )
+            if has_audio
+            else None
+        )
+
+        # -------------------------------------------------
+        # DURATIONS
+        # -------------------------------------------------
+
+        format_duration = safe_float(
+            format_data.get(
+                "duration"
+            )
+        )
+
+        video_duration = (
+            safe_float(
+                video_stream.get(
+                    "duration"
+                )
+            )
+            if has_video
+            else None
+        )
+
+        audio_duration = (
+            safe_float(
+                audio_stream.get(
+                    "duration"
+                )
+            )
+            if has_audio
+            else None
+        )
+
+        # Algunos MP4 no guardan duración individual
+        # en todos los streams.
+        if (
+            video_duration is None
+            and format_duration is not None
+        ):
+            video_duration = (
+                format_duration
+            )
+
+        if (
+            audio_duration is None
+            and format_duration is not None
+        ):
+            audio_duration = (
+                format_duration
+            )
+
+        av_duration_diff = None
+
+        if (
+            video_duration is not None
+            and audio_duration is not None
+        ):
+            av_duration_diff = abs(
+                video_duration -
+                audio_duration
+            )
+
+        # -------------------------------------------------
+        # FILE DATA
+        # -------------------------------------------------
+
+        file_size_bytes = len(
+            content
+        )
+
+        file_size_mb = (
+            file_size_bytes /
+            1024 /
+            1024
+        )
+
+        format_name = (
+            format_data.get(
+                "format_name"
+            )
+        )
+
+        # -------------------------------------------------
+        # QC
+        # -------------------------------------------------
+
+        errors = []
+        warnings = []
+
+        if not has_video:
+            errors.append(
+                "Video stream missing"
+            )
+
+        if not has_audio:
+            errors.append(
+                "Audio stream missing"
+            )
+
+        if has_video:
+
+            if video_codec != "h264":
+                errors.append(
+                    f"Unexpected video codec: {video_codec}"
+                )
+
+            if (
+                width != 1920
+                or height != 1080
+            ):
+                errors.append(
+                    f"Unexpected resolution: {width}x{height}"
+                )
+
+            if fps is None:
+                errors.append(
+                    "FPS could not be determined"
+                )
+
+            elif not (
+                29.8 <= fps <= 30.2
+            ):
+                errors.append(
+                    f"Unexpected FPS: {fps:.3f}"
+                )
+
+            if pixel_format not in [
+                "yuv420p",
+                "yuvj420p"
+            ]:
+                warnings.append(
+                    f"Unexpected pixel format: {pixel_format}"
+                )
+
+        if has_audio:
+
+            if audio_codec != "aac":
+                errors.append(
+                    f"Unexpected audio codec: {audio_codec}"
+                )
+
+            if (
+                audio_sample_rate is not None
+                and audio_sample_rate != 48000
+            ):
+                warnings.append(
+                    f"Audio sample rate is {audio_sample_rate}, expected 48000"
+                )
+
+            if (
+                audio_channels is not None
+                and audio_channels != 2
+            ):
+                warnings.append(
+                    f"Audio has {audio_channels} channels, expected stereo"
+                )
+
+        if (
+            format_duration is None
+            or format_duration <= 0
+        ):
+            errors.append(
+                "Invalid total duration"
+            )
+
+        if (
+            av_duration_diff is not None
+        ):
+
+            if av_duration_diff > 0.50:
+                errors.append(
+                    f"Audio/video duration mismatch: {av_duration_diff:.3f}s"
+                )
+
+            elif av_duration_diff > 0.20:
+                warnings.append(
+                    f"Minor audio/video duration difference: {av_duration_diff:.3f}s"
+                )
+
+        if file_size_bytes <= 0:
+            errors.append(
+                "Final file is empty"
+            )
+
+        qc_passed = (
+            len(errors) == 0
+        )
+
+        # -------------------------------------------------
+        # RESULT
+        # -------------------------------------------------
+
+        return {
+            "status":
+                "ok"
+                if qc_passed
+                else "qc_failed",
+
+            "qcVersion":
+                "v1_final_mp4_technical_qc",
+
+            "qcPassed":
+                qc_passed,
+
+            "hasVideo":
+                has_video,
+
+            "hasAudio":
+                has_audio,
+
+            "durationSec":
+                (
+                    round(
+                        format_duration,
+                        3
+                    )
+                    if format_duration
+                    is not None
+                    else None
+                ),
+
+            "videoDurationSec":
+                (
+                    round(
+                        video_duration,
+                        3
+                    )
+                    if video_duration
+                    is not None
+                    else None
+                ),
+
+            "audioDurationSec":
+                (
+                    round(
+                        audio_duration,
+                        3
+                    )
+                    if audio_duration
+                    is not None
+                    else None
+                ),
+
+            "avDurationDiffSec":
+                (
+                    round(
+                        av_duration_diff,
+                        3
+                    )
+                    if av_duration_diff
+                    is not None
+                    else None
+                ),
+
+            "width":
+                width,
+
+            "height":
+                height,
+
+            "fps":
+                (
+                    round(
+                        fps,
+                        3
+                    )
+                    if fps
+                    is not None
+                    else None
+                ),
+
+            "videoCodec":
+                video_codec,
+
+            "pixelFormat":
+                pixel_format,
+
+            "audioCodec":
+                audio_codec,
+
+            "audioSampleRate":
+                audio_sample_rate,
+
+            "audioChannels":
+                audio_channels,
+
+            "formatName":
+                format_name,
+
+            "fileSizeBytes":
+                file_size_bytes,
+
+            "fileSizeMB":
+                round(
+                    file_size_mb,
+                    2
+                ),
+
+            "errors":
+                errors,
+
+            "warnings":
+                warnings
+        }
 
 
 # =====================================================
@@ -724,7 +1377,9 @@ async def render_video(
             "output.mp4"
         )
 
-        audio_content = await audio.read()
+        audio_content = (
+            await audio.read()
+        )
 
         if not audio_content:
             return JSONResponse(
